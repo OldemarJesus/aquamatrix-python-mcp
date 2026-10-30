@@ -830,7 +830,7 @@
 <li>Add a pending trusted publisher with owner <code>OldemarJesus</code>, repository <code>aquamatrix-python-mcp</code>, workflow filename <code>publish.yml</code>, and environment <code>pypi</code>.</li>
 <li>Create a GitHub repository environment named <code>pypi</code>. Add protection/approval rules if appropriate.</li>
 <li>Update <code>project.version</code> in <code>pyproject.toml</code>, run checks, and commit the release.</li>
-<li>Create and publish a GitHub Release with a matching version tag, for example <code>v0.1.0</code>.</li>
+<li>Create and publish a GitHub Release with a matching version tag, for example <code>v0.1.1</code>.</li>
 </ol>
 <p>The workflow verifies that the release tag matches the package version, runs tests/lint/type checks, builds the source and wheel distributions, and publishes the validated artifacts using GitHub OIDC. No PyPI API token is stored as a GitHub secret.</p>
 <p>PyPI versions are immutable. For a failed or already-published version, fix the issue and release a new version rather than reusing the same one.</p>

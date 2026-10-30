@@ -117,7 +117,7 @@ def create_server(
 
     server = MCPServer(
         "Aquamatrix SIMAR",
-        version="0.1.0",
+        version="0.1.1",
         instructions=(
             "Read-only access to SIMAR invoice history, pending invoices, and billing summary. "
             "Amounts are decimal strings and dates are ISO calendar dates."
