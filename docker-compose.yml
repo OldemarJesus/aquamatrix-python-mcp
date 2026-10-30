@@ -1,0 +1,26 @@
+services:
+  aquamatrix-simar-mcp:
+    build:
+      context: .
+    image: aquamatrix-simar-mcp:local
+    restart: unless-stopped
+    environment:
+      SIMAR_NIF: ${SIMAR_NIF:?Set SIMAR_NIF in the environment}
+      SIMAR_PASSWORD: ${SIMAR_PASSWORD:?Set SIMAR_PASSWORD in the environment}
+      SIMAR_BASE_URL: ${SIMAR_BASE_URL:-https://www.aquamatrix.pt}
+      MCP_TRANSPORT: streamable-http
+      MCP_HOST: 0.0.0.0
+      MCP_ALLOW_NON_LOOPBACK: "true"
+      MCP_PORT: ${MCP_PORT:-8000}
+    ports:
+      - "127.0.0.1:${MCP_PORT:-8000}:${MCP_PORT:-8000}"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import os,socket; socket.create_connection(('127.0.0.1', int(os.environ['MCP_PORT'])), timeout=3).close()"
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3

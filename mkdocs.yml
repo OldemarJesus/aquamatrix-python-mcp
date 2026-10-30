@@ -1,0 +1,44 @@
+site_name: Aquamatrix SIMAR MCP Server
+site_description: Read-only MCP server for Aquamatrix SIMAR billing data
+site_url: https://oldemarjesus.github.io/aquamatrix-python-mcp/
+repo_url: https://github.com/OldemarJesus/aquamatrix-python-mcp
+repo_name: OldemarJesus/aquamatrix-python-mcp
+
+theme:
+  name: material
+  features:
+    - content.code.copy
+    - navigation.footer
+    - navigation.sections
+    - navigation.tabs
+    - search.highlight
+    - search.suggest
+  palette:
+    - scheme: default
+      primary: teal
+      accent: amber
+
+plugins:
+  - search
+
+nav:
+  - Home: index.md
+  - Guide:
+      - Installation and configuration: guide/installation.md
+      - Tools and transports: guide/tools.md
+      - Docker Compose: guide/docker.md
+      - Security: guide/security.md
+  - Project:
+      - Product requirements: https://github.com/OldemarJesus/aquamatrix-python-mcp/blob/main/PRD.md
+      - Architecture: https://github.com/OldemarJesus/aquamatrix-python-mcp/blob/main/ARCH.md
+      - License: https://github.com/OldemarJesus/aquamatrix-python-mcp/blob/main/LICENSE
+      - Release and publishing: guide/releasing.md
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - pymdownx.details
+  - pymdownx.highlight
+  - pymdownx.superfences
+
+strict: true

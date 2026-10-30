@@ -1,0 +1,71 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "aquamatrix-simar-mcp"
+version = "0.1.0"
+description = "MCP server for reading Aquamatrix SIMAR billing data"
+readme = "README.md"
+requires-python = ">=3.14"
+license = "MIT"
+authors = [{ name = "Oldemar Jesus", email = "oldemego@gmail.com" }]
+keywords = ["aquamatrix", "simar", "mcp", "billing", "async"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Framework :: AsyncIO",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Internet :: WWW/HTTP",
+]
+dependencies = [
+    "aquamatrix-simar>=0.1.0,<0.2",
+    "mcp>=2.3.0,<3",
+]
+
+[project.scripts]
+aquamatrix-simar-mcp = "aquamatrix_simar_mcp.__main__:main"
+
+[project.optional-dependencies]
+dev = [
+    "mkdocs-material>=9.6",
+    "mkdocstrings[python]>=0.29",
+    "mypy>=1.16",
+    "pytest>=8.3",
+    "pytest-asyncio>=1.0",
+    "ruff>=0.12",
+]
+
+[project.urls]
+Homepage = "https://github.com/OldemarJesus/aquamatrix-python-mcp"
+Repository = "https://github.com/OldemarJesus/aquamatrix-python-mcp"
+Issues = "https://github.com/OldemarJesus/aquamatrix-python-mcp/issues"
+Documentation = "https://oldemarjesus.github.io/aquamatrix-python-mcp/"
+SDK = "https://github.com/OldemarJesus/aquamatrix-python-sdk"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/aquamatrix_simar_mcp"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py314"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ASYNC"]
+
+[tool.mypy]
+python_version = "3.14"
+strict = true
+mypy_path = "src"
+
+[[tool.mypy.overrides]]
+module = ["aquamatrix_simar", "aquamatrix_simar.*"]
+ignore_missing_imports = true
