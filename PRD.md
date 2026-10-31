@@ -6,12 +6,13 @@ An async MCP server that makes the read-only billing capabilities of the indepen
 
 ## Users and problem
 
-SIMAR account holders and maintainers of AI-enabled integrations need a standard, host-independent way to retrieve their invoice history, pending invoices, and billing summary without duplicating portal authentication or HTML/form handling.
+SIMAR account holders and maintainers of AI-enabled integrations need a standard, host-independent way to retrieve supported billing, meter-reading, shortage, and graph data without duplicating portal authentication or HTML/form handling. Invoice history and pending invoices are temporarily unavailable in the SDK.
 
 ## MVP outcomes
 
 - Authenticate once per server lifecycle using `SIMAR_NIF` and `SIMAR_PASSWORD` environment variables.
-- Expose invoice history, pending invoices, and billing summary as read-only MCP tools.
+- Expose billing summary, latest and scheduled readings, water-shortage status, and billing graphs as read-only MCP tools.
+- Clearly omit invoice history and pending-invoice tools while the SDK disables those operations.
 - Preserve typed outputs, money precision, and ISO date semantics in structured tool results.
 - Support stdio for local MCP hosts and Streamable HTTP for local HTTP clients.
 - Include deterministic offline tests for MCP tool calls and SDK protocol behavior.

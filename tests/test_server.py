@@ -5,7 +5,12 @@ from urllib.parse import parse_qs
 
 import httpx
 import pytest
-from aquamatrix_simar import Invoice, SimarClient
+from aquamatrix_simar import (
+    GraphValue,
+    NextReadingsInfo,
+    ReadingInfo,
+    SimarClient,
+)
 from mcp import Client
 from mcp.server import MCPServer
 from mcp.types import CallToolResult, TextContent
@@ -15,19 +20,6 @@ from aquamatrix_simar_mcp.server import AppContext, create_server
 
 LOGIN_PAGE = '<input name="__RequestVerificationToken" value="login-token">'
 BILLING_PAGE = '<input name="__RequestVerificationToken" value="billing-token">'
-INVOICE_ROW = {
-    "ClientCode": "fixture-client",
-    "DocumentTypeDisplay": "Fatura",
-    "DocumentNumber": "fixture-invoice",
-    "Year": 2026,
-    "IssueDateDisplay": "2026-10-22",
-    "PaymentUntilDisplay": "2026-11-11",
-    "Value": 10.39,
-    "StateDisplay": "Em Cobrança",
-    "PaymentDate": None,
-}
-
-
 @pytest.fixture
 def settings() -> Settings:
     return Settings(
@@ -78,21 +70,27 @@ async def server_and_requests(
             assert fields["UserCode"] == ["synthetic-nif"]
             assert fields["Password"] == ["synthetic-password"]
             return httpx.Response(302, headers={"Location": "/SIMARnet/"})
-        if request.url.path.endswith("/Billing"):
-            return httpx.Response(200, text=BILLING_PAGE)
-        if request.url.path.endswith("GetInvoicesHistory"):
-            fields = parse_qs(request.content.decode())
-            assert fields["start"] == ["5"] or fields["start"] == ["0"]
-            if fields["start"] == ["5"]:
-                assert fields["length"] == ["10"]
-                assert fields["dateFrom"] == ["2026-01-01"]
-                assert fields["dateTo"] == ["2026-12-31"]
-            return httpx.Response(200, json={"data": [INVOICE_ROW]})
         if request.url.path.endswith("GetBillingInfo"):
             return httpx.Response(
                 200,
                 json={"InvoicesToPay": 1, "FailedInvoices": 2},
             )
+        if request.url.path.endswith("GetLastReadingInfo"):
+            return httpx.Response(
+                200,
+                json={"LastReadingDate": "2026-10-15", "Type": "SIMAR", "Value": "459,000"},
+            )
+        if request.url.path.endswith("GetNextReadingsInfo"):
+            return httpx.Response(200, json={"Company": "2026-11-20", "Client": "2026-11-21"})
+        if request.url.path.endswith("GetWaterShortagesInfo"):
+            return httpx.Response(200, json=False)
+        if request.url.path.endswith("GetLastInvoiceGraph"):
+            return httpx.Response(
+                200,
+                json=[{"Label": "VAT", "Value": 10.1834, "ValueDisplay": "EUR 10.18"}],
+            )
+        if request.url.path.endswith("GetBilledValuesGraph"):
+            return httpx.Response(200, json=[{"Label": "OCT-26", "Value": 54.77}])
         raise AssertionError(f"Unexpected request: {request.method} {request.url.path}")
 
     def client_factory(nif: str, password: str, *, base_url: str) -> SimarClient:
@@ -111,59 +109,39 @@ async def server_and_requests(
 
 
 @pytest.mark.asyncio
-async def test_tools_expose_sdk_data_as_structured_output(
+async def test_tools_expose_supported_sdk_features_as_structured_output(
     server_and_requests: tuple[MCPServer[AppContext], list[httpx.Request]],
 ) -> None:
     server, requests = server_and_requests
     async with Client(server, raise_exceptions=True) as client:
-        invoices = await client.call_tool(
-            "get_invoices",
-            {
-                "start": 5,
-                "limit": 10,
-                "date_from": "2026-01-01",
-                "date_to": "2026-12-31",
-            },
-        )
-        pending = await client.call_tool("get_pending_invoices", {})
         summary = await client.call_tool("get_billing_summary", {})
+        reading = await client.call_tool("get_last_reading", {})
+        next_readings = await client.call_tool("get_next_readings", {})
+        water_shortages = await client.call_tool("get_water_shortages", {})
+        last_invoice_graph = await client.call_tool("get_last_invoice_graph", {})
+        billed_values_graph = await client.call_tool("get_billed_values_graph", {})
 
-    assert isinstance(invoices, CallToolResult)
-    assert invoices.structured_content == {
-        "result": [
-            {
-                "client_code": "fixture-client",
-                "document_number": "fixture-invoice",
-                "document_type": "Fatura",
-                "year": 2026,
-                "issue_date": "2026-10-22",
-                "payment_until": "2026-11-11",
-                "amount": "10.39",
-                "state": "Em Cobrança",
-                "payment_date": None,
-                "is_pending": True,
-            }
-        ]
-    }
-    assert isinstance(pending, CallToolResult)
-    assert pending.structured_content == invoices.structured_content
     assert isinstance(summary, CallToolResult)
     assert summary.structured_content == {"invoices_to_pay": 1, "failed_invoices": 2}
-    assert any(request.url.path.endswith("GetInvoicesHistory") for request in requests)
+    assert isinstance(reading, CallToolResult)
+    assert reading.structured_content == {
+        "reading_date": "2026-10-15",
+        "reading_type": "SIMAR",
+        "value": "459,000",
+    }
+    assert next_readings.structured_content == {
+        "company_date": "2026-11-20",
+        "client_date": "2026-11-21",
+    }
+    assert water_shortages.structured_content == {"result": False}
+    assert last_invoice_graph.structured_content == {
+        "result": [{"label": "VAT", "value": "10.1834", "value_display": "EUR 10.18"}]
+    }
+    assert billed_values_graph.structured_content == {
+        "result": [{"label": "OCT-26", "value": "54.77", "value_display": None}]
+    }
     assert any(request.url.path.endswith("GetBillingInfo") for request in requests)
-
-
-@pytest.mark.asyncio
-async def test_invoice_history_rejects_reversed_dates(
-    server_and_requests: tuple[MCPServer[AppContext], list[httpx.Request]],
-) -> None:
-    server, _ = server_and_requests
-    async with Client(server) as client:
-        result = await client.call_tool(
-            "get_invoices",
-            {"date_from": "2026-12-31", "date_to": "2026-01-01"},
-        )
-    assert result.is_error
+    assert not any("InvoiceHistory" in request.url.path for request in requests)
 
 
 @pytest.mark.asyncio
@@ -177,13 +155,22 @@ async def test_sdk_exception_details_are_not_sent_to_client_or_logs(
         async def login(self) -> None:
             return
 
-        async def get_invoices(self, **_: object) -> list[Invoice]:
-            raise RuntimeError(sensitive_marker)
-
-        async def get_pending_invoices(self) -> list[Invoice]:
-            raise RuntimeError(sensitive_marker)
-
         async def get_billing_summary(self) -> dict[str, int]:
+            raise RuntimeError(sensitive_marker)
+
+        async def get_last_reading(self) -> ReadingInfo:
+            raise RuntimeError(sensitive_marker)
+
+        async def get_next_readings(self) -> NextReadingsInfo:
+            raise RuntimeError(sensitive_marker)
+
+        async def get_water_shortages(self) -> bool:
+            raise RuntimeError(sensitive_marker)
+
+        async def get_last_invoice_graph(self) -> list[GraphValue]:
+            raise RuntimeError(sensitive_marker)
+
+        async def get_billed_values_graph(self) -> list[GraphValue]:
             raise RuntimeError(sensitive_marker)
 
         async def aclose(self) -> None:
@@ -208,5 +195,12 @@ async def test_sdk_exception_details_are_not_sent_to_client_or_logs(
 async def test_server_declares_only_read_only_tools() -> None:
     server = create_server()
     tools = {tool.name: tool for tool in await server.list_tools()}
-    assert set(tools) == {"get_invoices", "get_pending_invoices", "get_billing_summary"}
+    assert set(tools) == {
+        "get_billing_summary",
+        "get_last_reading",
+        "get_next_readings",
+        "get_water_shortages",
+        "get_last_invoice_graph",
+        "get_billed_values_graph",
+    }
     assert all(tool.annotations and tool.annotations.read_only_hint for tool in tools.values())

@@ -27,8 +27,8 @@ Aquamatrix SIMAR portal
 
 1. The MCP server starts and reads `SIMAR_NIF`, `SIMAR_PASSWORD`, and optional `SIMAR_BASE_URL` from its environment.
 2. Its lifespan creates one `SimarClient`, calls `login()`, and yields the authenticated client as typed request context.
-3. Tools call only public SDK methods. `get_invoices` accepts a page and optional date range; the other tools return pending invoices and billing counts.
-4. Invoice amounts are serialized as decimal strings, while calendar dates are ISO-8601 strings, avoiding floating-point loss and timezone ambiguity.
+3. Tools call only public SDK methods: billing summary, latest reading, next reading dates, water-shortage status, latest-invoice graph, and billed-values graph. Invoice history and pending invoices are not exposed while the SDK disables those operations.
+4. Graph amounts are serialized as decimal strings, while calendar dates are ISO-8601 strings, avoiding floating-point loss and timezone ambiguity.
 5. Shutdown closes the SDK client in a `finally` block.
 
 Credentials are never MCP tool arguments. SDK errors are returned as tool errors without adding account details or request/response content.

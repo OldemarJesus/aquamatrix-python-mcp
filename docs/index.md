@@ -6,9 +6,12 @@ The server is unofficial, read-only, and not affiliated with SIMAR or Aquamatrix
 
 ## Tools
 
-- `get_invoices`: retrieve one page of invoice history with optional date filters.
-- `get_pending_invoices`: retrieve invoices the SDK recognizes as unpaid.
 - `get_billing_summary`: retrieve the portal's invoice-to-pay and failed-invoice counts.
+- `get_last_reading` and `get_next_readings`: retrieve latest and scheduled meter-reading details.
+- `get_water_shortages`: retrieve the portal's water-shortage status.
+- `get_last_invoice_graph` and `get_billed_values_graph`: retrieve billing graph values.
+
+Invoice history and pending-invoice tools are omitted while the SDK temporarily disables those operations.
 
 Money values are decimal strings and calendar dates use ISO `YYYY-MM-DD` format. Credentials are configured through the server environment, not exposed as tool inputs.
 

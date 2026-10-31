@@ -4,9 +4,12 @@ An async Model Context Protocol server exposing the read-only billing features o
 
 ## Tools
 
-- `get_invoices`: fetch one page of invoice history with optional date filtering.
-- `get_pending_invoices`: list invoices the SDK recognizes as unpaid.
 - `get_billing_summary`: return the portal's invoice-to-pay and failed-invoice counts.
+- `get_last_reading` and `get_next_readings`: return latest and scheduled meter-reading details.
+- `get_water_shortages`: report the portal's water-shortage status.
+- `get_last_invoice_graph` and `get_billed_values_graph`: return typed billing graph values.
+
+Invoice history and pending-invoice tools are omitted because the SDK temporarily disables those operations while the portal's history request is investigated.
 
 All tools are read-only. Invoice amounts are returned as decimal strings; dates use ISO `YYYY-MM-DD` strings. Credentials are supplied only through the server process environment, never through tool calls.
 

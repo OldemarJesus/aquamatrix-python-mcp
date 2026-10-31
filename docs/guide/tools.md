@@ -2,21 +2,23 @@
 
 ## Read-only tools
 
-### `get_invoices`
-
-Returns one page of invoices. `start` is a zero-based offset (`0` by default), and `limit` is between 1 and 500 (`100` by default). Optional `date_from` and `date_to` values use `YYYY-MM-DD` and are inclusive. A reversed date range is rejected.
-
-Invoice output includes document number/type, year, issue and payment dates, exact amount as a decimal string, portal state, payment date, client code when available, and the SDK's pending classification.
-
-### `get_pending_invoices`
-
-Returns invoices the SDK classifies as pending. The SDK owns the portal-state mapping and payment-status logic.
-
 ### `get_billing_summary`
 
 Returns `invoices_to_pay` and `failed_invoices` counts.
 
-All three tools are annotated as read-only. No tool accepts credentials or performs account mutations or payments.
+### `get_last_reading` and `get_next_readings`
+
+Return the latest meter reading, or the scheduled company and customer reading dates. Dates use ISO `YYYY-MM-DD` strings.
+
+### `get_water_shortages`
+
+Returns whether the portal reports a water shortage.
+
+### `get_last_invoice_graph` and `get_billed_values_graph`
+
+Return labeled graph values. Amounts are decimal strings to preserve precision; the portal's display string is included when available.
+
+Invoice history and pending-invoice tools are not exposed because the SDK temporarily disables those operations while the portal history request is investigated. All available tools are annotated as read-only; no tool accepts credentials or performs account mutations or payments.
 
 ## stdio
 

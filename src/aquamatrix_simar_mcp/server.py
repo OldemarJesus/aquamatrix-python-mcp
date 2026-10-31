@@ -5,15 +5,18 @@ from __future__ import annotations
 from collections.abc import AsyncGenerator, Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from datetime import date
-from typing import Annotated, Protocol, TypedDict
+from typing import Protocol, TypedDict
 
-from aquamatrix_simar import Invoice, SimarClient
+from aquamatrix_simar import (
+    GraphValue,
+    NextReadingsInfo,
+    ReadingInfo,
+    SimarClient,
+)
 from mcp.server import MCPServer
 from mcp.server.mcpserver import Context
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
-from pydantic import Field
 
 from aquamatrix_simar_mcp.config import Settings
 
@@ -23,18 +26,17 @@ class SimarApi(Protocol):
 
     async def login(self) -> None: ...
 
-    async def get_invoices(
-        self,
-        *,
-        start: int = 0,
-        limit: int = 100,
-        date_from: date | None = None,
-        date_to: date | None = None,
-    ) -> list[Invoice]: ...
-
-    async def get_pending_invoices(self) -> list[Invoice]: ...
-
     async def get_billing_summary(self) -> dict[str, int]: ...
+
+    async def get_last_reading(self) -> ReadingInfo: ...
+
+    async def get_next_readings(self) -> NextReadingsInfo: ...
+
+    async def get_water_shortages(self) -> bool: ...
+
+    async def get_last_invoice_graph(self) -> list[GraphValue]: ...
+
+    async def get_billed_values_graph(self) -> list[GraphValue]: ...
 
     async def aclose(self) -> None: ...
 
@@ -52,20 +54,27 @@ class AppContext:
     simar: SimarApi
 
 
-@dataclass(frozen=True, slots=True)
-class InvoiceOutput:
-    """JSON-safe invoice representation that preserves decimal precision."""
+class ReadingOutput(TypedDict):
+    """JSON-safe latest meter-reading details."""
 
-    document_number: str
-    document_type: str
-    year: int
-    issue_date: str
-    payment_until: str
-    amount: str
-    state: str
-    payment_date: str | None
-    client_code: str | None
-    is_pending: bool
+    reading_date: str
+    reading_type: str
+    value: str
+
+
+class NextReadingsOutput(TypedDict):
+    """JSON-safe scheduled reading dates."""
+
+    company_date: str
+    client_date: str
+
+
+class GraphValueOutput(TypedDict):
+    """JSON-safe graph value that preserves decimal precision."""
+
+    label: str
+    value: str
+    value_display: str | None
 
 
 class BillingSummaryOutput(TypedDict):
@@ -75,18 +84,26 @@ class BillingSummaryOutput(TypedDict):
     failed_invoices: int
 
 
-def _to_invoice_output(invoice: Invoice) -> InvoiceOutput:
-    return InvoiceOutput(
-        document_number=invoice.document_number,
-        document_type=invoice.document_type,
-        year=invoice.year,
-        issue_date=invoice.issue_date.isoformat(),
-        payment_until=invoice.payment_until.isoformat(),
-        amount=str(invoice.amount),
-        state=invoice.state,
-        payment_date=invoice.payment_date.isoformat() if invoice.payment_date else None,
-        client_code=invoice.client_code,
-        is_pending=invoice.is_pending,
+def _to_reading_output(reading: ReadingInfo) -> ReadingOutput:
+    return ReadingOutput(
+        reading_date=reading.reading_date.isoformat(),
+        reading_type=reading.reading_type,
+        value=reading.value,
+    )
+
+
+def _to_next_readings_output(readings: NextReadingsInfo) -> NextReadingsOutput:
+    return NextReadingsOutput(
+        company_date=readings.company_date.isoformat(),
+        client_date=readings.client_date.isoformat(),
+    )
+
+
+def _to_graph_value_output(value: GraphValue) -> GraphValueOutput:
+    return GraphValueOutput(
+        label=value.label,
+        value=str(value.value),
+        value_display=value.value_display,
     )
 
 
@@ -117,62 +134,16 @@ def create_server(
 
     server = MCPServer(
         "Aquamatrix SIMAR",
-        version="0.1.1",
+        version="0.2.0",
         instructions=(
-            "Read-only access to SIMAR invoice history, pending invoices, and billing summary. "
-            "Amounts are decimal strings and dates are ISO calendar dates."
+            "Read-only access to SIMAR billing summary, meter readings, water-shortage status, "
+            "and billing graphs. Graph amounts are decimal strings and dates are "
+            "ISO calendar dates. "
+            "Invoice history is currently unavailable."
         ),
         lifespan=lifespan,
     )
     read_only = ToolAnnotations(read_only_hint=True, destructive_hint=False)
-
-    @server.tool(
-        title="Get invoice history",
-        annotations=read_only,
-    )
-    async def get_invoices(
-        start: Annotated[
-            int,
-            Field(ge=0, description="Zero-based offset into invoice history."),
-        ] = 0,
-        limit: Annotated[
-            int,
-            Field(ge=1, le=500, description="Maximum number of invoices."),
-        ] = 100,
-        date_from: Annotated[date | None, Field(description="Inclusive start date (YYYY-MM-DD).")]
-        = None,
-        date_to: Annotated[date | None, Field(description="Inclusive end date (YYYY-MM-DD).")]
-        = None,
-        ctx: Context[AppContext] | None = None,
-    ) -> list[InvoiceOutput]:
-        """Fetch a page of invoices, optionally filtered by an inclusive date range."""
-        if date_from is not None and date_to is not None and date_from > date_to:
-            raise ToolError("date_from must be on or before date_to")
-        try:
-            simar = _context(ctx).simar
-            invoices = await simar.get_invoices(
-                start=start,
-                limit=limit,
-                date_from=date_from,
-                date_to=date_to,
-            )
-            return [_to_invoice_output(invoice) for invoice in invoices]
-        except ToolError:
-            raise
-        except Exception:
-            raise ToolError("Could not retrieve invoice history") from None
-
-    @server.tool(
-        title="Get pending invoices",
-        annotations=read_only,
-    )
-    async def get_pending_invoices(ctx: Context[AppContext] | None = None) -> list[InvoiceOutput]:
-        """Return invoices the SDK recognizes as unpaid."""
-        try:
-            invoices = await _context(ctx).simar.get_pending_invoices()
-            return [_to_invoice_output(invoice) for invoice in invoices]
-        except Exception:
-            raise ToolError("Could not retrieve pending invoices") from None
 
     @server.tool(
         title="Get billing summary",
@@ -190,6 +161,54 @@ def create_server(
             invoices_to_pay=summary["invoices_to_pay"],
             failed_invoices=summary["failed_invoices"],
         )
+
+    @server.tool(title="Get last reading", annotations=read_only)
+    async def get_last_reading(ctx: Context[AppContext] | None = None) -> ReadingOutput:
+        """Return the latest meter reading reported by SIMAR."""
+        try:
+            reading = await _context(ctx).simar.get_last_reading()
+        except Exception:
+            raise ToolError("Could not retrieve the latest reading") from None
+        return _to_reading_output(reading)
+
+    @server.tool(title="Get next readings", annotations=read_only)
+    async def get_next_readings(ctx: Context[AppContext] | None = None) -> NextReadingsOutput:
+        """Return the scheduled company and customer reading dates."""
+        try:
+            readings = await _context(ctx).simar.get_next_readings()
+        except Exception:
+            raise ToolError("Could not retrieve the next reading dates") from None
+        return _to_next_readings_output(readings)
+
+    @server.tool(title="Get water-shortage status", annotations=read_only)
+    async def get_water_shortages(ctx: Context[AppContext] | None = None) -> bool:
+        """Return whether SIMAR reports a water shortage."""
+        try:
+            return await _context(ctx).simar.get_water_shortages()
+        except Exception:
+            raise ToolError("Could not retrieve water-shortage status") from None
+
+    @server.tool(title="Get latest invoice graph", annotations=read_only)
+    async def get_last_invoice_graph(
+        ctx: Context[AppContext] | None = None,
+    ) -> list[GraphValueOutput]:
+        """Return the component values in the latest invoice graph."""
+        try:
+            values = await _context(ctx).simar.get_last_invoice_graph()
+        except Exception:
+            raise ToolError("Could not retrieve the latest invoice graph") from None
+        return [_to_graph_value_output(value) for value in values]
+
+    @server.tool(title="Get billed-values graph", annotations=read_only)
+    async def get_billed_values_graph(
+        ctx: Context[AppContext] | None = None,
+    ) -> list[GraphValueOutput]:
+        """Return historical billed values from SIMAR's graph."""
+        try:
+            values = await _context(ctx).simar.get_billed_values_graph()
+        except Exception:
+            raise ToolError("Could not retrieve the billed-values graph") from None
+        return [_to_graph_value_output(value) for value in values]
 
     return server
 
